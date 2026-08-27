@@ -1,0 +1,31 @@
+# Environment files and secrets
+.env
+.env.*
+!.env.example
+.pypi*.local
+
+# Python
+__pycache__/
+*.py[cod]
+.coverage
+devdocs/
+audit/
+.venv/
+venv/
+.packaging-venv/
+.packaging-tools/
+.package-test-venv/
+.upload-venv/
+.testpypi-venv/
+build/
+dist/
+*.egg-info/
+
+# Local tooling and generated data
+.idea/
+.vscode/
+*.log
+logs/
+cache/
+data/api_response_samples/
+data/test-artifacts/

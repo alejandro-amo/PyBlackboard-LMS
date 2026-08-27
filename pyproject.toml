@@ -1,0 +1,75 @@
+[build-system]
+requires = ["setuptools>=77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "PyBlackboard-LMS"
+version = "0.1.1"
+description = "Python and command-line interfaces for Blackboard LMS API."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+    { name = "Alex Amo", email = "hello@alejandroamo.eu" },
+]
+keywords = ["blackboard", "blackboard-learn", "cli", "education", "lms"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Education",
+]
+dependencies = [
+    "requests>=2.31,<3",
+    "pandas>=2.0,<3",
+    "XlsxWriter>=3.1,<4",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black>=24.0,<27",
+    "build>=1.2,<2",
+    "check-wheel-contents>=0.6,<1",
+    "mypy>=1.10,<2",
+    "ruff>=0.6,<1",
+    "twine>=5.1,<7",
+]
+
+[project.scripts]
+blackboard-cli = "blackboard_cli.cli:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+include-package-data = false
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["blackboard_api*", "blackboard_cli*"]
+namespaces = false
+
+[tool.black]
+line-length = 88
+target-version = ["py310"]
+extend-exclude = "^/(build|dist)/"
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+extend-exclude = ["build", "dist"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+
+[tool.mypy]
+python_version = "3.10"
+files = ["src"]
+check_untyped_defs = true
+warn_return_any = true
+warn_unused_ignores = true
+exclude = "^(build|dist)/"
