@@ -119,10 +119,10 @@ class EnrollmentServiceTests(unittest.TestCase):
         )
         self.assertEqual(client.enrollments.calls, [])
 
-    def test_ensure_change_role_activation_and_deletion_delegate_correctly(self):
+    def test_change_role_activation_and_deletion_delegate_correctly(self):
         client = FakeClient({"courseRoleId": "Student"})
         service = EnrollmentService(client.enrollments, client.enrollment_roles)
-        service.ensure_enrolled(
+        service.upsert(
             course_identifier="C", user_identifier="U", availability={"available": "No"}
         )
         service.change_role(course_identifier="C", user_identifier="U", course_role_id="Instructor")

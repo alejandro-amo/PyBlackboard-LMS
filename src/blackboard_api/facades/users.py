@@ -24,7 +24,7 @@ class UserFacade(ResourceFacade):
     def get(self, *, user_identifier: str) -> dict:
         return self._resource.get(user_identifier=user_identifier)
 
-    def create(self, data: dict) -> dict:
+    def create(self, *, data: dict) -> dict:
         """Create a user without Blackboard-generated ``id`` or UUID."""
         return self._resource.create(data)
 

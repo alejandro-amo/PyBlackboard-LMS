@@ -117,7 +117,6 @@ set-unavailable-enrollment
 set-disabled-enrollment
 find-enrollment
 upsert-enrollment
-ensure-enrolled-enrollment
 change-role-enrollment
 set-availability-enrollment
 activate-enrollment

@@ -25,7 +25,7 @@ class NodeFacade(ResourceFacade):
     def get(self, *, node_identifier: str) -> dict:
         return self._resource.get(node_identifier=node_identifier)
 
-    def create(self, data: dict) -> dict:
+    def create(self, *, data: dict) -> dict:
         """Create a node without Blackboard-generated ``id`` or UUID."""
         return self._resource.create(data)
 

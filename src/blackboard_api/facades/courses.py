@@ -24,7 +24,7 @@ class CourseFacade(ResourceFacade):
     def get(self, *, course_identifier: str) -> dict:
         return self._resource.get(course_identifier=course_identifier)
 
-    def create(self, data: dict) -> dict:
+    def create(self, *, data: dict) -> dict:
         """Create a course without Blackboard-generated ``id`` or UUID."""
         return self._resource.create(data)
 

@@ -133,22 +133,6 @@ class EnrollmentFacade(ResourceFacade):
             child_course_id=child_course_id,
         )
 
-    def ensure_enrolled(
-        self,
-        *,
-        course_identifier: str,
-        user_identifier: str,
-        course_role_id: str = "Student",
-        availability: dict | None = None,
-    ) -> dict:
-        """Ensure an enrollment exists with the requested role and availability."""
-        return self._service.ensure_enrolled(
-            course_identifier=course_identifier,
-            user_identifier=user_identifier,
-            course_role_id=course_role_id,
-            availability=availability,
-        )
-
     def change_role(
         self,
         *,

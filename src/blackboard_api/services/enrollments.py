@@ -71,22 +71,6 @@ class EnrollmentService:
             **self._update_arguments(changes),
         )
 
-    def ensure_enrolled(
-        self,
-        *,
-        course_identifier: str,
-        user_identifier: str,
-        course_role_id: str = "Student",
-        availability: dict | None = None,
-    ) -> dict:
-        """Ensure that an enrollment exists with the requested fields."""
-        return self.upsert(
-            course_identifier=course_identifier,
-            user_identifier=user_identifier,
-            course_role_id=course_role_id,
-            availability=availability,
-        )
-
     def change_role(
         self, *, course_identifier: str, user_identifier: str,
         course_role_id: str,

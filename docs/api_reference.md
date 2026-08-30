@@ -1,9 +1,12 @@
 # API Reference
 
-`BlackboardAPI` and its facades are the public API. `resources`, `services`,
-and the facade implementation are internal details.
+`BlackboardAPI` and its facades are the public API intended for use by Python scripts. 
+`resources`, `services`, the facade implementation, etc. are internal details and 
+users don't need to know or use them —unless for educative purposes.
 
-## Initialization
+## Basic initialization
+
+METHOD 1: passing all Blackboard instance connection parameters and secrets directly
 
 ```python
 from blackboard_api import BlackboardAPI
@@ -12,64 +15,111 @@ client = BlackboardAPI(
     url="https://blackboard.example.com",
     client_id="...",
     client_secret="...",
-    enable_write=False,
 )
 ```
+where `url` is the URL of the Blackboard instance. `client_id` is the value known as
+`APP_KEY` in the [Blackboard Developer Portal](https://developer.blackboard.com/portal/applications),
+and `client_secret` is the value known as `APP_SECRET` 
+(TIP: treat APP_SECRET like a password. Avoid hardcoding it).
+
+
+METHOD 2: passing a dot-env style file that already contains the connection parameters and secrets
 
 ```python
-BlackboardAPI(
-    url=None,
-    client_id=None,
-    client_secret=None,
-    env_file="path/to/config.env",
-    enable_write=False,
-    max_retries=None,
-    results_per_page=100,
+client = BlackboardAPI(
+    env_file="path/to/.env_file",
 )
 ```
 
 When credentials are omitted, `env_file` is required and credentials are loaded
-from that file. The API never selects a default ENV file.
-`enable_write` always defaults to `False`; the ENV file cannot enable writes.
-Pass `enable_write=True` explicitly to allow mutations. With writes disabled,
-`POST`, `PUT`, `PATCH`, and `DELETE` are blocked before transmission.
+from that file. 
 
-`BB_REQUEST_CONNECT_TIMEOUT` and `BB_REQUEST_READ_TIMEOUT` are optional ENV
-settings expressed as positive integer seconds. They default to `10` seconds
-for connection and `60` seconds for reads. They are deliberately omitted from
-`.env.example`; set them only when the target environment needs different
-timeouts.
+A minimum functional env_file sample is included:
 
-`results_per_page` is optional and defaults to `100`, the maximum accepted by
-the verified Blackboard instance. Do not change it without verifying that the
-target instance accepts another value. Continuation URLs (`paging.nextPage`)
-are followed exactly as Blackboard returns them.
+```text
+# Blackboard connection settings
+APP_KEY=replace-me
+APP_SECRET=replace-me
+BB_INSTANCE_URL=https://blackboard.example.com
 
-## Client state
+```
 
-- `token`: current token, or `None` before authentication.
-- `api_quota_remaining`: known remaining API requests, or `None`.
-- `max_requests_per_day`: known daily request maximum, or `None`.
+## Other initialization parameters
 
-Authentication, headers, API quota refresh, HTTP requests, and pagination are
-internal implementation details.
+`enable_write` always defaults to `False`. With writes disabled,
+`POST`, `PUT`, `PATCH`, and `DELETE` are blocked before transmission. 
+Always pass `enable_write=True` explicitly if you plan to create, delete or 
+update data in Blackboard:
 
-## Identifiers
+```python
+client = BlackboardAPI(
+    ...,
+	...,
+	enable_write=True,
+	...,
+	...
+)
+``` 
 
-Identifier parameters are keyword-only and validated before building a route.
-An unprefixed value is a primary ID.
+Also, you can enable or disable it later using `client.enable_write` (see below).
 
-- Courses: primary ID, `externalId`, `courseId`, and `uuid`.
-- Users: primary ID, `externalId`, `userName`, and `uuid`.
-- Nodes: primary ID and `externalId`.
-- Terms: primary ID and `externalId`.
+## Client state and API quota management
 
-Examples: `courseId:COURSE-1`, `externalId:USER-1`,
-`userName:user@example.com`, `uuid:...`, and `_1234_1`.
+- `client.enable_write`: indicates whether mutating operations are enabled. It defaults to `False`.
+- `client.token`: returns the current OAuth token, or `None` before authentication.
+- `client.api_quota_remaining`: returns the known number of remaining API requests, or `None`.
+- `client.max_requests_per_day`: returns the known maximum number of daily requests, or `None`.
+- `client.api_quota.get()`: retrieves the remaining API requests and the maximum daily request limit in a single data structure:
 
-These forms locate existing resources. Blackboard generates the primary `id`
-for every resource and `uuid` for courses and users. `create()` therefore
-rejects top-level `id` and `uuid`. Nodes and terms do not document a `uuid`.
+```python
+{
+    "remaining": 950,
+    "max_requests_per_day": 1000,
+}
+```
+
+Other aspects like authentication, headers, HTTP requests and pagination 
+are internal implementation details that are handled transparently.
+
+## How object identifiers are used
+
+Blackboard resources can be addressed with different identifier types. When an
+identifier is sent to an API method, its type can be specified with a prefix.
+
+### Supported identifier types
+
+An identifier without a prefix is interpreted as the resource's primary ID.
+Primary IDs are generated by Blackboard and usually look like `_12345_1`.
+
+| Resource | Supported identifiers |
+|---|---|
+| Course | Primary ID, `externalId`, `courseId`, `uuid` |
+| User | Primary ID, `externalId`, `userName`, `uuid` |
+| Node | Primary ID, `externalId` |
+| Term | Primary ID, `externalId` |
+
+The corresponding prefixes are:
+
+- Courses: `externalId:`, `courseId:`, and `uuid:`
+- Users: `externalId:`, `userName:`, and `uuid:`
+- Nodes: `externalId:`
+- Terms: `externalId:`
+
+Primary IDs are the most commonly used identifiers, but another type may be
+more convenient depending on the information available. For example, a user
+can be retrieved with `userName:user1234@example.com` when the primary ID is
+unknown. Similarly, `courseId` is often convenient because it is the course
+code visible in Blackboard's web interface, while the primary ID only appears
+in the course URL.
+
+### Creation and immutability
+
+Blackboard assigns the primary `id` to every resource at creation time. It also
+assigns a `uuid` to courses and users; nodes and terms do not support UUIDs.
+Neither `id` nor `uuid` can be supplied during creation or modified later.
+
+The `externalId` is client-controlled where supported. In Blackboard's web UI,
+a term's `externalId` is called **Source ID**.
 
 | Resource | Required creation fields | Optional client-controlled identifier |
 |---|---|---|
@@ -78,10 +128,10 @@ rejects top-level `id` and `uuid`. Nodes and terms do not document a `uuid`.
 | Term | `externalId`, `name` | — |
 | Node | `title` | `externalId` |
 
-`courseId` is the visible course code, not the primary `id`. Blackboard's web
-UI calls a term's `externalId` **Source ID**.
+before sending requests to Blackboard, `blackboard_api` validates that the 
+identifier prefixes provided are compatible with the type of object addressed.
 
-## Availability
+## Available, unavailable and disabled
 
 Courses, users, and enrollments provide:
 
@@ -89,83 +139,188 @@ Courses, users, and enrollments provide:
 - `set_unavailable(...)`: sets it to `No`.
 - `set_disabled(...)`: sets it to `Disabled`.
 
-They use `PATCH` and accept the same identifier types as `update`. `No` makes
-the resource unavailable; `Disabled` retains a disabled record, usually under
+Internally, these methods use a `PATCH` request and accept the same identifier types as `update`. 
+`No` makes the resource unavailable; `Disabled` retains a disabled record, usually under
 SIS or administrative data-state control. Course availability may also inherit
 from its term.
 
-## Public facades
+The difference between setting an object as unavailable and disabling it can be subtle, 
+and it's out of the scope of this document. Please refer to Blackboard documentation to learn more.
 
-### `client.courses`
+## Methods provided by the BlackboardAPI Python class
 
-`list()`, `iter()`, `get(*, course_identifier)`, `create(data)`,
-`update(*, course_identifier, data)`, `delete(*, course_identifier)`,
-`set_available`, `set_unavailable`, and `set_disabled` implement course CRUD.
-Course CRUD uses public v2 endpoints. `assign_node`, `unassign_node`,
-`list_by_node`, and `iter_by_node` use documented v1 node associations.
-`assign_term(*, course_identifier, term_identifier)` resolves the term and
-updates `termId`; `unassign_term(*, course_identifier)` removes it.
-`list_by_term(*, term_identifier)` returns the courses assigned to a term,
-using Blackboard's filtered v2 course collection endpoint.
-`get_copy_history(*, course_identifier)` returns the copy history of a given
-course.
+This documentation aims to be as detailed as possible. However, the data structures involved in object creation can be complex.
+If you plan to create courses, users, or other resources with a high level of detail and a complete set of attributes, please refer to the [Blackboard API documentation](https://developer.blackboard.com/assets/lib/swagger-ui/swagger-index.html?url=%2Fportal%2Fdocs%2Fapis%2Flearn-swagger.json) 
+for more information about their data models and accepted attributes.
 
-### `client.users`
+Also, remember that some attributes, such as id and uuid, cannot be specified when creating a resource or changed when updating it.
 
-`list()`, `iter()`, `get(*, user_identifier)`, `create(data)`,
-`update(*, user_identifier, data)`, `delete(*, user_identifier)`,
-`set_available`, `set_unavailable`, and `set_disabled` implement user CRUD.
-`assign_node`, `unassign_node`, `list_by_node`, and `iter_by_node` manage node
-membership. `change_username(*, current_username, new_username)` updates a
-user through the typed `userName:...` identifier.
+All public facade methods that accept parameters require named arguments.
 
-`assign_node(..., primary=False)` was accepted by the test tenant even when the
-user had no remaining primary-node association. The node-membership list
-response confirms the association but does not expose an `isPrimary` field, so
-the persisted primary flag cannot currently be read back through this facade.
-The test tenant also rejects `GET` on the node-user association route with 405,
-returns 404 for a user-node association route, and omits `isPrimary` even when
-it is requested through `fields`. The `PUT` association response likewise only
-contains `nodeId` and `userId`.
+Regarding nodes, the externalId of a node is shown as "Identifier" in web interface. For example, if the identifier of a given node is `SCIENCE`, you can use `node_identifier="externalId:SCIENCE"` to refer to it.
 
-### `client.nodes`
+### Course management
 
-`list()`, `iter()`, `get(*, node_identifier)`, `create(data)`,
-`update(*, node_identifier, data)`, and `delete(*, node_identifier)` implement
-node CRUD. `list_by_course(*, course_identifier)` and
-`list_by_user(*, user_identifier)` return a resource's node memberships.
+`client.courses.list()`: retrieves a structured list of courses.
 
-### `client.terms`
+`client.courses.iter()`: similar to client.courses.list(), but data is delivered through an iterator to optimize memory consumption in loops etc.
 
-Terms represent academic periods and use public v1 endpoints. `list()`,
-`iter()`, `get(*, term_identifier)`, `create(data)`,
-`update(*, term_identifier, data)`, and `delete(*, term_identifier)` implement
-term CRUD. `get_by_course(*, course_identifier)` returns the assigned term or
-`None`.
+`client.courses.get(course_identifier="_12345_1")`: retrieves information of a single course.
 
-### `client.enrollments`
+`client.courses.create(data=data)`: creates a course. `data` is expected to be a Python dictionary containing, at least, the mandatory attributes for a course creation, i.e.:
 
-Atomic methods are `list_by_course`, `iter_by_course`, `list_by_user`,
-`iter_by_user`, `get`, `create`, `update`, `delete`, and the three availability
-convenience methods. They require keyword-only course and user identifiers.
+```python
+data = {
+    "courseId": "COURSE-001",
+    "name": "Introduction to Python",
+}
+```
 
-Composite methods are `find`, `upsert`, `ensure_enrolled`, `change_role`,
-`set_availability`, `activate`, `deactivate`, `delete_if_exists`,
-`validate_course_role`, `list_for_courses`, `list_for_users`,
-`enroll_user_in_courses`, and `enroll_users_in_course`. `upsert` creates or
-updates only differing fields and validates course roles through an in-memory,
-lazily loaded role cache. Bulk list methods preserve input order and remove
-duplicate identifiers.
+`client.courses.update(course_identifier="_12345_1", data=data)`: updates a course. `data` is expected to be a Python dictionary containing whatever course attributes need to be changed.
 
-### `client.enrollment_roles`
+`client.courses.delete(course_identifier="_12345_1")`: deletes a course. 
 
-`list()` returns all course roles and `iter()` yields them lazily. Roles have
-no mutating operations.
+`client.courses.set_available(course_identifier="_12345_1")`: sets given course as available. 
 
-### `client.api_quota`
+`client.courses.set_unavailable(course_identifier="_12345_1")`: sets given course as unavailable.
 
-`get()` returns `remaining` and `max_requests_per_day`. API quota is distinct
-from the HTTP `limit` pagination parameter and `results_per_page`.
+`client.courses.set_disabled(course_identifier="_12345_1")`: sets given course as disabled.
+
+`client.courses.assign_node(course_identifier="_12345_1", node_identifier="_67890_1")`: creates a relation between a course and a node of the institutional hierarchy. You can also specify `primary=False` if the course already has a relation with another node, so the previous node will continue being considered the primary. 
+
+`client.courses.unassign_node(course_identifier="_12345_1", node_identifier="_67890_1")`: destroys a relation between a course and a node of the institutional hierarchy.
+
+`client.courses.list_by_node(node_identifier="_67890_1")`: retrieves a structured list of courses that have relation with the given node of the institutional hierarchy.
+
+`client.courses.iter_by_node(node_identifier="_67890_1")`: returns an iterator with a structured list of courses that have relation with the given node of the institutional hierarchy.
+
+`client.courses.assign_term(course_identifier="_12345_1", term_identifier="_67890_1")`: sets course to be part of the given term.
+
+`client.courses.unassign_term(course_identifier="_12345_1")`: removes the course from its current term.
+
+`client.courses.list_by_term(term_identifier="_67890_1")`: retrieves the courses assigned to a term.
+
+`client.courses.get_copy_history(course_identifier="_12345_1")`: retrieves the copy history of a course.
+
+### User management
+
+`client.users.list()`: retrieves a structured list of users.
+
+`client.users.iter()`: returns an iterator over users to optimize memory consumption.
+
+`client.users.get(user_identifier="_12345_1")`: retrieves information about a single user.
+
+`client.users.create(data=data)`: creates a user from a Python dictionary containing the required attributes.
+
+`client.users.update(user_identifier="_12345_1", data=data)`: updates the specified user with the attributes in `data`.
+
+`client.users.delete(user_identifier="_12345_1")`: deletes a user.
+
+`client.users.set_available(user_identifier="_12345_1")`: sets a user as available.
+
+`client.users.set_unavailable(user_identifier="_12345_1")`: sets a user as unavailable.
+
+`client.users.set_disabled(user_identifier="_12345_1")`: sets a user as disabled.
+
+`client.users.assign_node(user_identifier="_12345_1", node_identifier="_67890_1")`: creates a relationship between a user and a node. The Blackboard API also accepts the optional `primary` parameter here. However, unlike course–node associations, the parameter has no observable effect for user–node associations: Blackboard does not expose the resulting isPrimary value in either the creation response or subsequent membership queries.
+
+`client.users.unassign_node(user_identifier="_12345_1", node_identifier="_67890_1")`: removes the relation between a user and a node.
+
+`client.users.list_by_node(node_identifier="_67890_1")`: retrieves the users related to a node.
+
+`client.users.iter_by_node(node_identifier="_67890_1")`: returns an iterator over the users related to a node.
+
+`client.users.change_username(current_username="user@example.com", new_username="new@example.com")`: changes a user's username.
+
+### Node management
+
+`client.nodes.list()`: retrieves a structured list of nodes.
+
+`client.nodes.iter()`: returns an iterator over nodes to optimize memory consumption.
+
+`client.nodes.get(node_identifier="_12345_1")`: retrieves information about a single node.
+
+`client.nodes.create(data=data)`: creates a node from a Python dictionary containing the required attributes.
+
+`client.nodes.update(node_identifier="_12345_1", data=data)`: updates the specified node with the attributes in `data`.
+
+`client.nodes.delete(node_identifier="_12345_1")`: deletes a node.
+
+`client.nodes.list_by_course(course_identifier="_12345_1")`: retrieves the nodes related to a course.
+
+`client.nodes.list_by_user(user_identifier="_12345_1")`: retrieves the nodes related to a user.
+
+### Term management
+
+`client.terms.list()`: retrieves a structured list of terms.
+
+`client.terms.iter()`: returns an iterator over terms to optimize memory consumption.
+
+`client.terms.get(term_identifier="_12345_1")`: retrieves information about a single term.
+
+`client.terms.create(data=data)`: creates a term from a Python dictionary containing the required attributes.
+
+`client.terms.update(term_identifier="_12345_1", data=data)`: updates the specified term with the attributes in `data`.
+
+`client.terms.delete(term_identifier="_12345_1")`: deletes a term.
+
+`client.terms.get_by_course(course_identifier="_12345_1")`: retrieves the term assigned to a course, or `None` if no term is assigned.
+
+### Enrollment management
+
+`client.enrollments.list_by_course(course_identifier="_12345_1")`: retrieves enrollments in a course.
+
+`client.enrollments.iter_by_course(course_identifier="_12345_1")`: returns an iterator over course enrollments.
+
+`client.enrollments.list_by_user(user_identifier="_12345_1")`: retrieves a user's enrollments.
+
+`client.enrollments.iter_by_user(user_identifier="_12345_1")`: returns an iterator over a user's enrollments.
+
+`client.enrollments.get(course_identifier="_12345_1", user_identifier="_67890_1")`: retrieves a specific enrollment.
+
+`client.enrollments.create(course_identifier="_12345_1", user_identifier="_67890_1", course_role_id="Student")`: enrolls a user in a course.
+
+`client.enrollments.update(course_identifier="_12345_1", user_identifier="_67890_1", course_role_id="Instructor", availability={"available": "Yes"})`: updates an enrollment.
+
+`client.enrollments.delete(course_identifier="_12345_1", user_identifier="_67890_1")`: removes an enrollment.
+
+`client.enrollments.set_available(course_identifier="_12345_1", user_identifier="_67890_1")`: sets an enrollment as available.
+
+`client.enrollments.set_unavailable(course_identifier="_12345_1", user_identifier="_67890_1")`: sets an enrollment as unavailable.
+
+`client.enrollments.set_disabled(course_identifier="_12345_1", user_identifier="_67890_1")`: sets an enrollment as disabled.
+
+`client.enrollments.find(course_identifier="_12345_1", user_identifier="_67890_1")`: searches for an enrollment and returns it when found.
+
+`client.enrollments.upsert(course_identifier="_12345_1", user_identifier="_67890_1", course_role_id="Student", availability={"available": "Yes"})`: creates an enrollment or updates its differing fields.
+
+`client.enrollments.change_role(course_identifier="_12345_1", user_identifier="_67890_1", course_role_id="Instructor")`: changes an enrollment's course role.
+
+`client.enrollments.set_availability(course_identifier="_12345_1", user_identifier="_67890_1", available="Yes")`: sets an enrollment's availability state.
+
+`client.enrollments.activate(course_identifier="_12345_1", user_identifier="_67890_1")`: sets an enrollment as available.
+
+`client.enrollments.deactivate(course_identifier="_12345_1", user_identifier="_67890_1")`: sets an enrollment as unavailable.
+
+`client.enrollments.delete_if_exists(course_identifier="_12345_1", user_identifier="_67890_1")`: deletes an enrollment when it exists.
+
+`client.enrollments.validate_course_role(course_role_id="Student")`: validates and returns a course role.
+
+`client.enrollments.list_for_courses(course_identifiers=["_12345_1", "_12346_1"])`: retrieves enrollments for multiple courses in input order.
+
+`client.enrollments.list_for_users(user_identifiers=["_67890_1", "_67891_1"])`: retrieves enrollments for multiple users in input order.
+
+`client.enrollments.enroll_user_in_courses(user_identifier="_67890_1", course_identifiers=["_12345_1", "_12346_1"], course_role_id="Student")`: enrolls one user in multiple courses.
+
+`client.enrollments.enroll_users_in_course(course_identifier="_12345_1", user_identifiers=["_67890_1", "_67891_1"], course_role_id="Student")`: enrolls multiple users in one course.
+
+### Enrollment role management
+
+`client.enrollment_roles.list()`: retrieves all available course roles.
+
+`client.enrollment_roles.iter()`: returns an iterator over the available course roles.
+
+Enrollment roles do not provide mutating operations.
 
 ## Internal layers
 

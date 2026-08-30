@@ -24,7 +24,7 @@ class TermFacade(ResourceFacade):
     def get(self, *, term_identifier: str) -> dict:
         return self._resource.get(term_identifier=term_identifier)
 
-    def create(self, data: dict) -> dict:
+    def create(self, *, data: dict) -> dict:
         """Create a term without Blackboard-generated ``id`` or UUID."""
         return self._resource.create(data)
 

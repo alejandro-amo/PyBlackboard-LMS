@@ -120,7 +120,7 @@ class TestResources:
 
     def _create_term(self, index: int) -> dict:
         term = self.client.terms.create(
-            {
+            data={
                 "externalId": f"{self.prefix}-TERM-{index}",
                 "name": f"{self.prefix} term {index}",
             }
@@ -129,7 +129,7 @@ class TestResources:
 
     def _create_node(self, index: int) -> dict:
         node = self.client.nodes.create(
-            {
+            data={
                 "externalId": f"{self.prefix}-NODE-{index}",
                 "title": f"{self.prefix} node {index}",
             }
@@ -138,7 +138,7 @@ class TestResources:
 
     def _create_user(self, index: int) -> dict:
         user = self.client.users.create(
-            {
+            data={
                 "externalId": f"{self.prefix}-USER-{index}",
                 "userName": f"{self.prefix.lower()}-user-{index}@test.invalid",
                 "password": f"BbCliIt!{secrets.token_urlsafe(18)}",
@@ -152,7 +152,7 @@ class TestResources:
 
     def _create_course(self, index: int) -> dict:
         course = self.client.courses.create(
-            {
+            data={
                 "courseId": f"{self.prefix}-COURSE-{index}",
                 "externalId": f"{self.prefix}-COURSE-EXTERNAL-{index}",
                 "name": f"{self.prefix} course {index}",
